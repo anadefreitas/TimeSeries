@@ -1,0 +1,71 @@
+//Avaliação da temperatura média em série temporal
+//Autora: Ana Larissa Freitas
+
+//Importar coleção: MODIS/061/MOD11A2
+//Importar geometria: 
+
+//Transformar o produto em um dado mensal
+
+//1.Criar uma lista de anos e meses
+var anos = ee.List.sequence(2003, 2021);
+var meses = ee.List.sequence(1,12);
+
+
+//2.Criar a estrutura para a conversão das informações
+//Cria as imagens a partir da estrutura interativa definida
+var mensal_modis = ee.ImageCollection.fromImages(
+  //ano
+  
+  anos.map(function(anos){
+    //meses
+    return meses.map(function(meses){
+      //criar o filtro com base nas funções
+      var temp_mensal = modis.filter(ee.Filter.calendarRange(anos,anos,'year')) 
+                             .filter(ee.Filter.calendarRange(meses,meses,'month'))
+                             .select(['LST_Day_1km'],['Temperatura']) //Renomear a banda de interesse
+                             .mean() //Será calculada a média dos valores para o mês e ano
+                             .multiply(0.02) //Aplicar o fator de escala
+                             .subtract(273.15); //Transformar em °C
+                              
+    
+      return temp_mensal.set('ano', anos) //vamos adcionar informações que são perdidas quando aplicamos os passos acima
+                  .set('mes', meses)
+                  .set('system:time_start', ee.Date.fromYMD(anos, meses, 1).millis()); //padrão do GEE, epictime com millis
+    });
+  }).flatten()); //transformar a saída em uma coleção para que possamos trabalhar
+
+print(mensal_modis);
+Map.addLayer(mensal_modis);
+///ajusta para
+ var grafico = ui.Chart.image.series({
+   //definir a coleção de imagens
+   imageCollection: mensal_modis,
+   //área de interesse
+   region: area,
+   //determina a agregação dos dados: transformar esses dados de raster em um valor
+   reducer: ee.Reducer.mean(),
+   //define a escala do produto
+   scale: 1000,
+   //propriedade do eixo x
+   xProperty: 'system:time_start'
+   
+}).setOptions({
+  //título
+  titles: 'MODIS Temperatura Mensal',
+  //eixo horizontal
+  hAxis: {title: 'Data', titleTextStyle:{intalic: false, bold: true}},
+  //eixo vertical
+  vAxis: {title: 'Temperatura média de superfície (°C)', titleTextStyle:{intalic: false, bold: true}},
+  //largura da linha
+  lineWidth: 3,
+  //cor da linha
+  colors: ['red'], //que é uma lista, e podemos atribuir um valor para cada linha.
+  //tipo de linha
+  curveType: 'funcion'
+});
+
+print(grafico);
+
+///Fim do script///
+
+//referência para outros formatos: https://developers.google.com/earth-engine/guides/charts_feature
